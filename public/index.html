@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notes App</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f2f5; min-height: 100vh; }
+    header { background: #2c3e50; color: white; padding: 16px 32px; }
+    header h1 { font-size: 22px; }
+    .container { max-width: 900px; margin: 32px auto; padding: 0 16px; }
+    .form-card { background: white; border-radius: 8px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    .form-card h2 { margin-bottom: 16px; font-size: 16px; color: #2c3e50; }
+    input, textarea { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; margin-bottom: 12px; }
+    textarea { height: 80px; resize: vertical; }
+    .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    .btn-primary { background: #2c3e50; color: white; }
+    .btn-danger { background: #e74c3c; color: white; }
+    .btn-edit { background: #3498db; color: white; }
+    .notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+    .note-card { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    .note-card h3 { font-size: 15px; color: #2c3e50; margin-bottom: 8px; }
+    .note-card p { font-size: 13px; color: #666; margin-bottom: 12px; line-height: 1.5; }
+    .note-meta { font-size: 11px; color: #aaa; margin-bottom: 12px; }
+    .note-actions { display: flex; gap: 8px; }
+    .empty { text-align: center; color: #aaa; padding: 48px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <header><h1>📝 Notes App</h1></header>
+  <div class="container">
+    <div class="form-card">
+      <h2 id="form-title">Add New Note</h2>
+      <input type="hidden" id="edit-id">
+      <input type="text" id="note-title" placeholder="Title">
+      <textarea id="note-content" placeholder="Content..."></textarea>
+      <button class="btn btn-primary" onclick="saveNote()">Save Note</button>
+      <button class="btn" id="cancel-btn" style="display:none;margin-left:8px;background:#eee" onclick="cancelEdit()">Cancel</button>
+    </div>
+    <div id="notes-container"><div class="empty">No notes yet. Create your first note above!</div></div>
+  </div>
+  <script>
+    async function loadNotes() {
+      const res = await fetch('/api/notes');
+      const json = await res.json();
+      const c = document.getElementById('notes-container');
+      if (!json.data.length) { c.innerHTML = '<div class="empty">No notes yet. Create your first note above!</div>'; return; }
+      c.innerHTML = '<div class="notes-grid">' + json.data.map(n => `
+        <div class="note-card">
+          <h3>${esc(n.title)}</h3>
+          <p>${esc(n.content)}</p>
+          <div class="note-meta">Created: ${new Date(n.createdAt).toLocaleString()}</div>
+          <div class="note-actions">
+            <button class="btn btn-edit" onclick="editNote(${n.id},'${esc(n.title)}','${esc(n.content)}')">Edit</button>
+            <button class="btn btn-danger" onclick="deleteNote(${n.id})">Delete</button>
+          </div>
+        </div>`).join('') + '</div>';
+    }
+    function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    async function saveNote() {
+      const id = document.getElementById('edit-id').value;
+      const title = document.getElementById('note-title').value.trim();
+      const content = document.getElementById('note-content').value.trim();
+      if (!title || !content) return alert('Please fill in both fields.');
+      const url = id ? `/api/notes/${id}` : '/api/notes';
+      const method = id ? 'PUT' : 'POST';
+      await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify({title, content}) });
+      cancelEdit(); loadNotes();
+    }
+    function editNote(id, title, content) {
+      document.getElementById('edit-id').value = id;
+      document.getElementById('note-title').value = title;
+      document.getElementById('note-content').value = content;
+      document.getElementById('form-title').textContent = 'Edit Note';
+      document.getElementById('cancel-btn').style.display = 'inline-block';
+    }
+    function cancelEdit() {
+      document.getElementById('edit-id').value = '';
+      document.getElementById('note-title').value = '';
+      document.getElementById('note-content').value = '';
+      document.getElementById('form-title').textContent = 'Add New Note';
+      document.getElementById('cancel-btn').style.display = 'none';
+    }
+    async function deleteNote(id) {
+      if (!confirm('Delete this note?')) return;
+      await fetch(`/api/notes/${id}`, { method: 'DELETE' });
+      loadNotes();
+    }
+    loadNotes();
+  </script>
+</body>
+</html>
